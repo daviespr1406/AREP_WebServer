@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Arep</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="container">
+    <h1>Arep</h1>
+    <img src="/img/logo.png" id="hero" alt="Imagen de prueba">
+  </header>
+
+  <main class="container">
+    <section>
+      <h2>GET</h2>
+      <label>Nombre:
+        <input type="text" id="name" value="John">
+      </label>
+      <button id="btnGet">Enviar</button>
+      <div id="getrespmsg" class="box"></div>
+    </section>
+
+    <section>
+      <h2>POST</h2>
+      <label>Nombre:
+        <input type="text" id="postname" value="John">
+      </label>
+      <button id="btnPost">Enviar</button>
+      <div id="postrespmsg" class="box"></div>
+    </section>
+  </main>
+
+  <script>
+    document.getElementById('btnGet').addEventListener('click', function() {
+      const name = encodeURIComponent(document.getElementById('name').value);
+      const xhr = new XMLHttpRequest();
+      xhr.onload = function() {
+        document.getElementById('getrespmsg').textContent = this.responseText;
+      };
+      xhr.open('GET', '/hello?name=' + name);
+      xhr.send();
+    });
+
+    document.getElementById('btnPost').addEventListener('click', function() {
+      const name = encodeURIComponent(document.getElementById('postname').value);
+      fetch('/hellopost?name=' + name, { method: 'POST' })
+        .then(r => r.text())
+        .then(txt => document.getElementById('postrespmsg').textContent = txt)
+        .catch(console.error);
+    });
+  </script>
+</body>
+</html>
