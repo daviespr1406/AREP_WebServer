@@ -1,18 +1,19 @@
-# HttpServerAsync
+# Arep Server
+## David Santiago Espinosa Rojas
 
 Un servidor HTTP simple y asíncrono en **Java**, capaz de atender múltiples clientes mediante hilos.  
 Soporta peticiones básicas `GET` y `POST`, rutas dinámicas y la entrega de archivos estáticos.
 
 ---
 
-## 📌 Requisitos
+## Requisitos
 
 - **Java 17 o superior**
 - Sistema operativo compatible con Java (Windows, Linux o macOS).
 
 ---
 
-## 📂 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 HttpServerAsync/
@@ -27,7 +28,7 @@ HttpServerAsync/
 
 ---
 
-## ▶️ Compilación y Ejecución
+## Compilación y Ejecución
 
 ### 1. Compilar
 ```bash
@@ -49,7 +50,7 @@ http://localhost:35000/
 
 ---
 
-## 📌 Rutas Disponibles
+## Rutas Disponibles
 
 ### `/`  
 Entrega el archivo `index.html` desde `src/main/resources`.
@@ -79,7 +80,7 @@ http://localhost:35000/images/logo.png
 
 ---
 
-## 🔑 Manejo de Tokens en la Petición
+## Manejo de Tokens en la Petición
 
 El servidor procesa la primera línea de la petición HTTP usando **`StringTokenizer`**:
 
@@ -99,7 +100,7 @@ Con esta información se enruta la solicitud a:
 
 ---
 
-## 📖 Ejemplo en Navegador
+## Ejemplo en Navegador
 
 1. Levantar el servidor.
 2. Abrir en el navegador:
@@ -112,10 +113,3 @@ http://localhost:35000/style.css
 
 ---
 
-## ✅ Futuras Mejoras
-- Manejo de JSON en `POST`.
-- Autenticación con tokens JWT.
-- Uso de `ExecutorService` en lugar de `Thread` por conexión.
-- Integración con frontend (React/Vue).
-
----
