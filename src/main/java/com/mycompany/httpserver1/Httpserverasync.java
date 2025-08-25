@@ -2,147 +2,89 @@ package com.mycompany.httpserver1;
 
 import java.io.*;
 import java.net.*;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Httpserverasync {
-    private static final int PORT = 35000;
-    private static final String WEB_ROOT = "public";
-    private static final String DEFAULT_FILE = "/index.html";
+    private int port;
+    private ExecutorService executor = Executors.newFixedThreadPool(8);
 
-    public static void main(String[] args) {
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("Servidor escuchando en puerto " + PORT + "...");
+    public Httpserverasync(int port) {
+        this.port = port;
+    }
+
+    public void start() {
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("Server running on port " + port);
             while (true) {
-                try (Socket clientSocket = serverSocket.accept()) {
-                    handleClient(clientSocket);
-                } catch (IOException e) {
-                    System.err.println("Error con cliente: " + e.getMessage());
-                }
+                Socket clientSocket = serverSocket.accept();
+                executor.submit(() -> handleClient(clientSocket));
             }
         } catch (IOException e) {
-            System.err.println("No se pudo abrir el puerto " + PORT + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    private static void handleClient(Socket socket) throws IOException {
-        socket.setSoTimeout(5000);
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-             OutputStream out = socket.getOutputStream()) {
+    private void handleClient(Socket clientSocket) {
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+             OutputStream out = clientSocket.getOutputStream()) {
 
-            String requestLine = in.readLine();
-            if (requestLine == null || requestLine.isEmpty()) return;
+            String line = in.readLine();
+            if (line == null || line.isEmpty()) return;
 
-            System.out.println(">> " + requestLine);
+            String[] parts = line.split(" ");
+            String method = parts[0];
+            String fullPath = parts[1];
+            String path = fullPath.split("\\?")[0];
+            Map<String, String> queryParams = parseQuery(fullPath);
 
-            String header;
-            while ((header = in.readLine()) != null && !header.isEmpty()) {
-            }
+            HttpRequest request = new HttpRequest(method, path, queryParams);
+            HttpResponse response = new HttpResponse();
 
-            StringTokenizer tokens = new StringTokenizer(requestLine);
-            String method = tokens.nextToken();
-            String rawPath = tokens.nextToken(); 
+            var handler = Service.match(method, path);
 
-            if (rawPath.equals("/")) rawPath = DEFAULT_FILE;
-
-            if (rawPath.startsWith("/hello")) {
-                handleHello(rawPath, out);
-            } else if (rawPath.startsWith("/hellopost")) {
-                handleHelloPost(rawPath, out, method);
+            if (handler != null) {
+                String body = handler.apply(request, response);
+                response.setBody(body);
             } else {
-                serveStaticFile(rawPath, out);
+                // Servir archivos estáticos
+                Path filePath = Paths.get(Service.getStaticFolder(), path);
+                if (Files.exists(filePath) && !Files.isDirectory(filePath)) {
+                    String content = Files.readString(filePath);
+                    response.setContentType(getMimeType(filePath.toString()));
+                    response.setBody(content);
+                } else {
+                    response.setStatus(404);
+                    response.setBody("404 Not Found");
+                }
+            }
+
+            out.write(response.build().getBytes());
+            out.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private Map<String, String> parseQuery(String fullPath) {
+        Map<String, String> query = new HashMap<>();
+        if (fullPath.contains("?")) {
+            String q = fullPath.split("\\?", 2)[1];
+            for (String param : q.split("&")) {
+                String[] kv = param.split("=");
+                if (kv.length == 2) {
+                    query.put(kv[0], kv[1]);
+                }
             }
         }
+        return query;
     }
 
-    private static void handleHello(String rawPath, OutputStream out) throws IOException {
-        Map<String, String> q = parseQueryParams(rawPath);
-        String name = q.getOrDefault("name", "World");
-        String body = "Hello, " + name + "!";
-        sendResponse(out, 200, "OK", "text/plain; charset=utf-8", body.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static void handleHelloPost(String rawPath, OutputStream out, String method) throws IOException {
-        Map<String, String> q = parseQueryParams(rawPath);
-        String name = q.getOrDefault("name", "World");
-        String body = "Hello from POST, " + name + "!";
-        sendResponse(out, 200, "OK", "text/plain; charset=utf-8", body.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static void serveStaticFile(String rawPath, OutputStream out) throws IOException {
-        Path requested = Paths.get(WEB_ROOT, rawPath).normalize();
-        if (!requested.startsWith(Paths.get(WEB_ROOT))) {
-            sendForbidden(out);
-            return;
-        }
-
-        if (!Files.exists(requested) || Files.isDirectory(requested)) {
-            sendNotFound(out);
-            return;
-        }
-
-        String mime = getMimeType(requested);
-        byte[] bytes = Files.readAllBytes(requested);
-        sendResponse(out, 200, "OK", mime, bytes);
-    }
-
-    private static String getMimeType(Path path) throws IOException {
-        String mime = Files.probeContentType(path);
-        if (mime != null) return mime;
-        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
-        if (name.endsWith(".html") || name.endsWith(".htm")) return "text/html; charset=utf-8";
-        if (name.endsWith(".css")) return "text/css; charset=utf-8";
-        if (name.endsWith(".js")) return "application/javascript; charset=utf-8";
-        if (name.endsWith(".png")) return "image/png";
-        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
-        if (name.endsWith(".gif")) return "image/gif";
-        if (name.endsWith(".svg")) return "image/svg+xml";
-        if (name.endsWith(".ico")) return "image/x-icon";
-        return "application/octet-stream";
-    }
-
-    private static Map<String, String> parseQueryParams(String rawPath) {
-        Map<String, String> map = new HashMap<>();
-        int qIdx = rawPath.indexOf('?');
-        if (qIdx < 0) return map;
-        String query = rawPath.substring(qIdx + 1);
-        for (String pair : query.split("&")) {
-            if (pair.isEmpty()) continue;
-            String[] kv = pair.split("=", 2);
-            String k = urlDecode(kv[0]);
-            String v = kv.length > 1 ? urlDecode(kv[1]) : "";
-            map.put(k, v);
-        }
-        return map;
-    }
-
-    private static String urlDecode(String s) {
-        try {
-            return java.net.URLDecoder.decode(s, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            return s;
-        }
-    }
-
-    private static void sendNotFound(OutputStream out) throws IOException {
-        String html = "<h1>404 Not Found</h1>";
-        sendResponse(out, 404, "Not Found", "text/html; charset=utf-8", html.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static void sendForbidden(OutputStream out) throws IOException {
-        String html = "<h1>403 Forbidden</h1>";
-        sendResponse(out, 403, "Forbidden", "text/html; charset=utf-8", html.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static void sendResponse(OutputStream out, int code, String status, String contentType, byte[] body) throws IOException {
-        String headers =
-            "HTTP/1.1 " + code + " " + status + "\r\n" +
-            "Content-Type: " + contentType + "\r\n" +
-            "Content-Length: " + body.length + "\r\n" +
-            "Connection: close\r\n" +
-            "\r\n";
-        out.write(headers.getBytes(StandardCharsets.US_ASCII));
-        out.write(body);
+    private String getMimeType(String filename) {
+        if (filename.endsWith(".html")) return "text/html";
+        if (filename.endsWith(".css")) return "text/css";
+        if (filename.endsWith(".js")) return "application/javascript";
+        return "text/plain";
     }
 }
