@@ -18,7 +18,11 @@ Soporta peticiones básicas `GET` y `POST`, rutas dinámicas y la entrega de arc
 ```
 HttpServerAsync/
 │── src/main/java/com/mycompany/httpserver1/
-│     ├── Httpserverasync.java   # Clase principal
+│     ├── WebAplication.java   # Clase principal
+│     ├── Httpserverasync.java   # Clase servidor
+│     ├── Service.java   # servicios
+│     ├── httpRequest.java   # Peticiones
+│     └── httpResponse.java  # Respuestas
 │
 │── src/main/resources/
 │     ├── index.html             # Página por defecto
@@ -32,12 +36,12 @@ HttpServerAsync/
 
 ### 1. Compilar
 ```bash
-javac -d src/main/java/com/mycompany/httpserver1 src/main/java/com/mycompany/httpserver1/Httpserverasync.java
+mvn clean compile
 ```
 
 ### 2. Ejecutar
 ```bash
-java -cp src/main/java/com/mycompany/httpserver1 com.mycompany.httpserver1.Httpserverasync
+java -cp target/classes com.mycompany.httpserver1.WebApplication
 ```
 
 El servidor escucha en **puerto 35000**.  
@@ -70,33 +74,23 @@ Hello, Juan!
 ### `/hellopost` (POST)
 Ejemplo de manejo de peticiones POST.  
 Actualmente responde con un mensaje de confirmación.
+### `/Index`
+Devuelve index.html
 
+Ejemplo:
+```
+http://localhost:35000/index
+```
+Respuesta:
+```
+index.html
+```
 ### Archivos Estáticos
 El servidor sirve archivos de la carpeta `resources`:
 ```
 http://localhost:35000/style.css
 http://localhost:35000/images/logo.png
 ```
-
----
-
-## Manejo de Tokens en la Petición
-
-El servidor procesa la primera línea de la petición HTTP usando **`StringTokenizer`**:
-
-```java
-StringTokenizer tokens = new StringTokenizer(requestLine);
-String method = tokens.nextToken();
-String rawPath = tokens.nextToken(); 
-```
-
-- `method` → tipo de petición (`GET`, `POST`, etc).  
-- `rawPath` → ruta solicitada.  
-
-Con esta información se enruta la solicitud a:
-- `handleHello`  
-- `handleHelloPost`  
-- `serveStaticFile`
 
 ---
 
